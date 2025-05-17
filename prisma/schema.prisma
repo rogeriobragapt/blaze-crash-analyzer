@@ -1,0 +1,120 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  bankSettings  BankSetting?       
+  manualResults ManualCrashResult[]
+  aiSuggestions AiSuggestion[]
+  identifiedPatterns UserIdentifiedPattern[] 
+
+  accounts Account[]
+  sessions Session[]
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?
+  access_token       String?
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model ManualCrashResult {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timestamp DateTime @default(now())
+  isWin     Boolean  
+  multiplier Float   
+}
+
+model AiLearnedPattern {
+  id                String    @id @default(cuid())
+  patternSequence   String    @unique 
+  nextResultWinRate Float     
+  totalOccurrences  Int       @default(0)
+  winOccurrences    Int       @default(0)
+  lastSeen          DateTime  @updatedAt
+  suggestions       AiSuggestion[] // Relação inversa adicionada
+}
+
+model UserIdentifiedPattern {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patternSequence String    
+  expectedResult  String    
+  source          String    
+  isMarked        Boolean   @default(false) 
+  createdAt       DateTime  @default(now())
+  @@unique([userId, patternSequence, source])
+}
+
+model AiSuggestion {
+  id                 String    @id @default(cuid())
+  userId             String    
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timestamp          DateTime  @default(now())
+  triggeringPattern  String    
+  suggestedOutcome   String    
+  confidence         Float?    
+  targetMultiplier   Float?    
+  actualOutcome      String?   
+  aiLearnedPatternId String?   
+  aiLearnedPattern   AiLearnedPattern? @relation(fields: [aiLearnedPatternId], references: [id])
+}
+
+model BankSetting {
+  id                  String  @id @default(cuid())
+  userId              String  @unique
+  user                User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  initialBankroll     Float   @default(0)
+  profitTarget        Float   @default(0)
+  initialCycleStake   Float   @default(0)
+  stopLossPercentage  Float   @default(0) 
+  defaultMultiplier   Float   @default(2.0)
+  isActive            Boolean @default(false)
+  currentBankroll     Float?  
+  cycleProfitTarget   Float?  
+  currentStake        Float?  
+  updatedAt           DateTime @updatedAt
+}
